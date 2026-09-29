@@ -7,6 +7,18 @@ iPAS AI 應用規劃師（初級）刷題網站。純靜態網頁，一個 `inde
 - 練習模式（即時對答）、計時模擬考、錯題本、收藏、學習指引重點整理
 - 作答紀錄存在瀏覽器的 localStorage，不需要帳號或後端
 
+## Google 登入
+
+網站用 Google Identity Services 做登入，只有 `config.json` 裡 `allowedEmails` 列出的帳號能進入。
+
+- `googleClientId`：Google Cloud 專案 `ipas-quiz` 的 OAuth 網頁用戶端 ID（已授權來源 `https://amilycc.github.io`）
+- `allowedEmails`：允許登入的 Google 帳號
+- OAuth 同意畫面目前是「測試」狀態，新增帳號時也要到 Google Cloud 控制台 → Google Auth Platform → 目標對象 → 測試使用者 加入同一個信箱
+- 登入狀態保留 30 天；改完 `config.json` 後執行 `python build.py`
+- `googleClientId` 設為 `null` 會關閉登入，網站直接開放使用
+
+這是前端的登入門檻：題庫檔案仍在公開的 repository 裡，登入不會保護題目內容。
+
 ## 部署到 GitHub Pages
 
 1. 在 GitHub 建立新的 repository（例如 `ipas-quiz`），可選 Public 或 Private（Private 需付費方案才能開 Pages）。
@@ -33,7 +45,8 @@ index.html            網站本體（題庫與重點已內嵌，可離線開啟�
 data/questions.json   題庫（469 題）
 data/notes.json       重點整理
 src/template.html     網頁模板
-build.py              修改 data/ 後重新產生 index.html
+config.json           Google 登入設定（用戶端 ID、允許帳號）
+build.py              修改 data/ 或 config.json 後重新產生 index.html
 .nojekyll             讓 GitHub Pages 原樣輸出檔案
 ```
 
