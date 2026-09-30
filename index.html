@@ -456,26 +456,20 @@ function rNotes(){
   app.querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>startPractice({subj:+b.dataset.subj,srcs:['guide'],sess:[],sec:b.dataset.sec,range:'all',order:'seq'}));
 }
 
-/* ---------- Google 登入（OAuth） ---------- */
+/* ---------- Google 登入（OAuth）＋ 雲端硬碟自動同步 ---------- */
 (function initAuth(){
   const gate=$('#gate'),msg=$('#gatemsg'),box=$('#gsignin'),bout=$('#gsignout'),who=$('#who');
   const CID=window.GOOGLE_CLIENT_ID, allowed=(window.ALLOWED_EMAILS||[]).map(e=>e.toLowerCase());
-  const SKEY='ipas-aiap-session', DAYS=30;
+  const SKEY='ipas-aiap-session', TKEY='ipas-aiap-drive-token', DAYS=30;
+  const FNAME='ipas-aiap-progress.json';
+  const SCOPES='openid email profile https://www.googleapis.com/auth/drive.appdata';
   let started=false;
   function start(){ if(!started){started=true; go('home');} }
   if(!CID){ gate.hidden=true; start(); return; }
-  function readSession(){ try{ const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&s.exp>Date.now()&&allowed.includes(s.email)) return s; }catch(e){} return null; }
-  function decode(jwt){ const b=jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); return JSON.parse(decodeURIComponent(escape(atob(b+'==='.slice((b.length+3)%4))))); }
-  function enter(s){
-    who.innerHTML=`${s.picture?`<img src="${esc(s.picture)}" alt="" referrerpolicy="no-referrer">`:''}<span class="whoname">${esc(s.email)}</span><button class="btn small" id="syncbtn" title="同步到 Google 雲端硬碟">☁ 連接雲端硬碟</button><button class="btn small ghost" id="logout">登出</button>`;
-    who.hidden=false; gate.hidden=true;
-    $('#logout').onclick=()=>{ if(mock&&!mock.done){toast('模擬考進行中，交卷後再登出');return}
-      try{localStorage.removeItem(SKEY);localStorage.removeItem(TKEY)}catch(e){} if(window.google&&google.accounts) google.accounts.id.disableAutoSelect(); location.reload(); };
-    start(); initDrive(s.email);
-  }
 
-  /* ---------- Google 雲端硬碟同步（appDataFolder） ---------- */
-  const TKEY='ipas-aiap-drive-token', FNAME='ipas-aiap-progress.json', SCOPE='https://www.googleapis.com/auth/drive.appdata';
+  function readSession(){ try{ const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&s.exp>Date.now()&&allowed.includes(s.email)) return s; }catch(e){} return null; }
+  function readToken(email){ try{ const t=JSON.parse(localStorage.getItem(TKEY)||'null'); if(t&&t.exp>Date.now()+60000&&t.email===email) return t.token; }catch(e){} return null; }
+  function saveToken(tok,email,sec){ try{ localStorage.setItem(TKEY,JSON.stringify({token:tok,email,exp:Date.now()+(sec||3600)*1000})) }catch(e){} }
   function mergeState(a,b){
     const out={ans:{},wrong:[],star:[],mocks:[]};
     const ids=new Set([...Object.keys(a.ans||{}),...Object.keys(b.ans||{})]);
@@ -485,10 +479,49 @@ function rNotes(){
     const seen=new Set(); [...(a.mocks||[]),...(b.mocks||[])].sort((p,q)=>p.t-q.t).forEach(m=>{if(!seen.has(m.t)){seen.add(m.t);out.mocks.push(m)}});
     out.updated=Math.max(a.updated||0,b.updated||0); return out;
   }
-  function initDrive(email){
-    const btn=$('#syncbtn'); let token=null, fileId=null, tokenClient=null, pushTimer=null, busy=false;
-    try{const t=JSON.parse(localStorage.getItem(TKEY)||'null'); if(t&&t.exp>Date.now()+60000&&t.email===email) token=t.token;}catch(e){}
-    const setBtn=(txt,title)=>{btn.textContent=txt; if(title) btn.title=title;};
+  function gisReady(cb,n=0){ if(window.google&&google.accounts&&google.accounts.oauth2) cb(); else if(n<100) setTimeout(()=>gisReady(cb,n+1),100); else msg.textContent='無法載入 Google 登入元件，請檢查網路或關閉阻擋器後重新整理。'; }
+
+  /* 一個 token client 同時負責登入與雲端硬碟授權；callback 依情境交給 pending */
+  let tokenClient=null, pending=null;
+  function getClient(){
+    if(!tokenClient) tokenClient=google.accounts.oauth2.initTokenClient({client_id:CID,scope:SCOPES,callback:resp=>{const f=pending;pending=null;f&&f(resp)},error_callback:err=>{const f=pending;pending=null;f&&f({error:err&&err.type||'popup_failed'})}});
+    return tokenClient;
+  }
+  function requestToken(opts,cb){ pending=cb; getClient().requestAccessToken(opts); }
+
+  /* ----- 登入畫面 ----- */
+  function showLogin(text){
+    gate.hidden=false; who.hidden=true; msg.textContent=text;
+    box.innerHTML='<button class="gbtn" id="gbtn"><svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.6A14.6 14.6 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.1 1.4-4.9 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.9l-8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>使用 Google 帳號登入</button>';
+    $('#gbtn').onclick=()=>gisReady(()=>requestToken({prompt:'consent'},onLoginToken));
+  }
+  async function onLoginToken(resp){
+    if(!resp||resp.error||!resp.access_token){ msg.textContent='登入沒有完成，請再試一次。'; return; }
+    msg.textContent='登入中…';
+    let u; try{ u=await (await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}})).json(); }catch(e){ msg.textContent='無法取得帳號資料，請再試一次。'; return; }
+    const email=(u.email||'').toLowerCase();
+    if(!u.email_verified||!allowed.includes(email)){ msg.textContent=(u.email||'這個帳號')+' 沒有使用權限，請改用已授權的帳號。'; try{google.accounts.oauth2.revoke(resp.access_token,()=>{})}catch(e){} bout.hidden=false; return; }
+    const scopesOk=google.accounts.oauth2.hasGrantedAllScopes(resp,'https://www.googleapis.com/auth/drive.appdata');
+    const s={email,name:u.name||'',picture:u.picture||'',exp:Date.now()+DAYS*864e5};
+    try{localStorage.setItem(SKEY,JSON.stringify(s))}catch(e){}
+    if(scopesOk) saveToken(resp.access_token,email,resp.expires_in);
+    enter(s, scopesOk?resp.access_token:null);
+    if(!scopesOk) toast('沒有勾選雲端硬碟權限，紀錄只會存在這台裝置');
+  }
+  bout.onclick=()=>{ bout.hidden=true; msg.textContent='請選擇其他 Google 帳號登入。'; };
+
+  /* ----- 登入後 ----- */
+  function enter(s,token){
+    who.innerHTML=`${s.picture?`<img src="${esc(s.picture)}" alt="" referrerpolicy="no-referrer">`:''}<span class="whoname">${esc(s.email)}</span><button class="btn small ghost" id="syncbtn" title="Google 雲端硬碟同步狀態">☁ 同步中…</button><button class="btn small ghost" id="logout">登出</button>`;
+    who.hidden=false; gate.hidden=true;
+    $('#logout').onclick=()=>{ if(mock&&!mock.done){toast('模擬考進行中，交卷後再登出');return}
+      try{localStorage.removeItem(SKEY);localStorage.removeItem(TKEY)}catch(e){} location.reload(); };
+    start(); initDrive(s.email, token||readToken(s.email));
+  }
+
+  function initDrive(email,token){
+    const btn=$('#syncbtn'); let fileId=null, pushTimer=null, busy=false, dirty=false, waitingGesture=false;
+    const setBtn=(txt,title)=>{btn.textContent=txt; btn.title=title||txt;};
     async function api(url,opt={}){
       const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+token},opt.headers||{})}));
       if(r.status===401){ token=null; try{localStorage.removeItem(TKEY)}catch(e){} throw new Error('auth'); }
@@ -497,66 +530,58 @@ function rNotes(){
     }
     async function findFile(){
       const q=encodeURIComponent(`name='${FNAME}'`);
-      const r=await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&pageSize=10`);
-      const j=await r.json(); return j.files&&j.files[0]?j.files[0].id:null;
+      const j=await (await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id)&pageSize=10`)).json();
+      return j.files&&j.files[0]?j.files[0].id:null;
     }
     async function upload(){
       const body=JSON.stringify(S);
       if(fileId){ await api(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{method:'PATCH',headers:{'Content-Type':'application/json'},body}); return; }
-      const boundary='ipasb'+Date.now();
-      const multipart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:FNAME,parents:['appDataFolder']})}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
-      const r=await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
-      fileId=(await r.json()).id;
+      const bd='ipasb'+Date.now();
+      const mp=`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:FNAME,parents:['appDataFolder']})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`;
+      fileId=(await (await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:mp})).json()).id;
     }
+    const okText=()=>setBtn('☁ 已同步','已同步到你的 Google 雲端硬碟 · '+new Date().toLocaleTimeString('zh-TW'));
+    function onFail(e){ if(e.message==='auth') needToken(); else setBtn('☁ 同步失敗','同步失敗，會在下次作答時重試；也可以點這裡重試'); }
     async function fullSync(){
-      if(!token||busy) return; busy=true; setBtn('☁ 同步中…');
+      if(!token){ needToken(); return; } if(busy){ dirty=true; return; } busy=true; setBtn('☁ 同步中…');
       try{
         if(!fileId) fileId=await findFile();
-        if(fileId){ const r=await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`); let remote={}; try{remote=await r.json()}catch(e){}
+        if(fileId){ let remote={}; try{ remote=await (await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`)).json(); }catch(e){ if(e.message==='auth') throw e; }
           S=mergeState(S,remote); try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} }
-        await upload(); setBtn('☁ 已同步','已同步到你的 Google 雲端硬碟 · '+new Date().toLocaleTimeString('zh-TW'));
+        await upload(); dirty=false; okText();
         if(!(mock&&!mock.done)&&!(view==='practice'&&session)) render();
-      }catch(e){ setBtn(e.message==='auth'?'☁ 重新連接雲端硬碟':'☁ 同步失敗，點此重試'); }
-      busy=false;
+      }catch(e){ onFail(e); }
+      busy=false; if(dirty&&token) push();
     }
-    window.__drivePush=()=>{ if(!token) return; clearTimeout(pushTimer); setBtn('☁ 待同步');
-      pushTimer=setTimeout(async()=>{ if(busy){window.__drivePush();return} busy=true; setBtn('☁ 同步中…');
-        try{ if(!fileId) fileId=await findFile(); await upload(); setBtn('☁ 已同步','已同步到你的 Google 雲端硬碟 · '+new Date().toLocaleTimeString('zh-TW')); }
-        catch(e){ setBtn(e.message==='auth'?'☁ 重新連接雲端硬碟':'☁ 同步失敗，點此重試'); }
-        busy=false; },1500); };
-    function getToken(){
-      if(!tokenClient){
-        if(!(window.google&&google.accounts&&google.accounts.oauth2)){ toast('Google 元件還沒載入，請稍候再試'); return; }
-        tokenClient=google.accounts.oauth2.initTokenClient({client_id:CID,scope:SCOPE,hint:email,callback:resp=>{
-          if(resp.error){ setBtn('☁ 連接雲端硬碟'); toast('沒有取得雲端硬碟授權'); return; }
-          token=resp.access_token; try{localStorage.setItem(TKEY,JSON.stringify({token,email,exp:Date.now()+(resp.expires_in||3600)*1000}))}catch(e){}
-          fullSync(); }});
-      }
-      tokenClient.requestAccessToken({prompt:''});
+    function push(){
+      if(!token){ dirty=true; needToken(); return; }
+      clearTimeout(pushTimer); setBtn('☁ 待同步');
+      pushTimer=setTimeout(async()=>{ if(busy){dirty=true;return} busy=true; setBtn('☁ 同步中…');
+        try{ if(!fileId) fileId=await findFile(); await upload(); dirty=false; okText(); }catch(e){ onFail(e); }
+        busy=false; if(dirty&&token) push(); },1500);
     }
-    btn.onclick=()=>{ if(token) fullSync(); else getToken(); };
-    if(token) fullSync(); else setBtn('☁ 連接雲端硬碟','點一下授權，把紀錄同步到你的 Google 雲端硬碟');
+    window.__drivePush=push;
+    /* token 過期（約 1 小時）時自動續期：瀏覽器只允許在使用者操作時開授權視窗，
+       所以在下一次點擊或按鍵時靜默續期（已授權過不會再問，視窗會自動關閉）。 */
+    function renew(){
+      if(!waitingGesture) return; waitingGesture=false;
+      document.removeEventListener('pointerdown',renew,true); document.removeEventListener('keydown',renew,true);
+      gisReady(()=>requestToken({prompt:'',hint:email,login_hint:email},resp=>{
+        if(resp&&resp.access_token&&google.accounts.oauth2.hasGrantedAllScopes(resp,'https://www.googleapis.com/auth/drive.appdata')){ token=resp.access_token; saveToken(token,email,resp.expires_in); fullSync(); }
+        else { setBtn('☁ 點此重新連線','雲端硬碟授權沒有完成，點這裡再試一次'); }
+      }));
+    }
+    function needToken(){
+      token=null; setBtn('☁ 待同步','下次點擊時會自動重新連線雲端硬碟');
+      if(waitingGesture) return; waitingGesture=true;
+      document.addEventListener('pointerdown',renew,true); document.addEventListener('keydown',renew,true);
+    }
+    btn.onclick=()=>{ if(token) fullSync(); };
+    if(token) fullSync(); else needToken();
   }
-  function showLogin(text){ gate.hidden=false; who.hidden=true; msg.textContent=text; }
-  const sess=readSession(); if(sess){ enter(sess); return; }
-  showLogin('請用已授權的 Google 帳號登入。');
-  function onCred(resp){
-    let p; try{ p=decode(resp.credential); }catch(e){ msg.textContent='登入資料無法解析，請再試一次。'; return; }
-    const email=(p.email||'').toLowerCase();
-    if(p.aud!==CID||!p.email_verified||p.exp*1000<Date.now()){ msg.textContent='登入驗證失敗，請再試一次。'; return; }
-    if(!allowed.includes(email)){ msg.textContent=p.email+' 沒有使用權限，請改用已授權的帳號。'; bout.hidden=false; return; }
-    const s={email,name:p.name||'',picture:p.picture||'',exp:Date.now()+DAYS*864e5};
-    try{localStorage.setItem(SKEY,JSON.stringify(s))}catch(e){}
-    enter(s);
-  }
-  bout.onclick=()=>{ if(window.google) google.accounts.id.disableAutoSelect(); bout.hidden=true; msg.textContent='請選擇其他 Google 帳號登入。'; };
-  (function waitGIS(n){
-    if(window.google&&google.accounts&&google.accounts.id){
-      google.accounts.id.initialize({client_id:CID,callback:onCred,auto_select:false,ux_mode:'popup'});
-      google.accounts.id.renderButton(box,{theme:'outline',size:'large',text:'signin_with',shape:'rectangular',locale:'zh-TW'});
-    } else if(n<100) setTimeout(()=>waitGIS(n+1),100);
-    else msg.textContent='無法載入 Google 登入元件，請檢查網路或關閉阻擋器後重新整理。';
-  })(0);
+
+  const sess=readSession(); if(sess){ enter(sess,null); return; }
+  showLogin('請用已授權的 Google 帳號登入。登入時一併授權雲端硬碟，作答紀錄會自動同步到你的 Google 雲端硬碟。');
 })();
 })();
 </script>
