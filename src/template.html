@@ -58,7 +58,7 @@ section.view{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding-t
 section.view>*{min-width:0}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:500}
+.btn{text-decoration:none;display:inline-block;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:500}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.ghost{background:transparent}
@@ -142,6 +142,8 @@ details.sec>summary{cursor:pointer;padding:16px 20px;list-style:none;display:fle
 details.sec>summary::-webkit-details-marker{display:none}
 details.sec>summary h2{font-size:18px}
 details.sec>summary .secno{font-family:var(--mono);color:var(--accent);font-weight:700;margin-right:10px}
+.srcl{margin-top:8px;font-size:13px;color:var(--muted)}
+.srcl a{color:var(--accent)}
 .secbody{padding:0 20px 20px;display:grid;gap:18px}
 .topic h3{font-size:15.5px;margin-bottom:6px}
 .topic ul{margin:0;padding-left:1.2em;display:grid;gap:4px;max-width:70ch}
@@ -152,6 +154,7 @@ details.sec>summary .secno{font-family:var(--mono);color:var(--accent);font-weig
 .gbtn{display:inline-flex;align-items:center;gap:10px;justify-content:center;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 18px;font-weight:500;cursor:pointer}
 .gbtn:hover{border-color:var(--accent)}
 .who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+@media (max-width:520px){.who .whoname{display:none}}
 .who img{width:24px;height:24px;border-radius:50%}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:14px;z-index:20}
 .src{font-size:13px;color:var(--muted)}
@@ -203,12 +206,19 @@ const EXAM_DATE=new Date('2026-11-07T08:00:00+08:00');
 const KEY='ipas-aiap-v1';
 let S={ans:{},wrong:[],star:[],mocks:[]};
 try{const r=localStorage.getItem(KEY); if(r) S=Object.assign(S,JSON.parse(r));}catch(e){}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){S.updated=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} if(window.__drivePush) window.__drivePush();}
 const $=s=>document.querySelector(s);
 const app=$('#app');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,1800)}
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function srcLinks(q){
+  if(!q.pdf) return '';
+  const u=(pg)=>esc(q.pdf)+(pg?'#page='+pg:'');
+  const a=`<a href="${u(q.page)}" target="_blank" rel="noopener">${q.src==='exam'?'官方公告試題 PDF':'學習指引 PDF'} 第 ${q.page} 頁</a>`;
+  const b=q.src==='guide'&&q.apage?`　<a href="${u(q.apage)}" target="_blank" rel="noopener">官方解析在第 ${q.apage} 頁</a>`:'';
+  return `<div class="srcl">出處：${a}${b}</div>`;
+}
 function metaOf(q){return q.src==='exam'?`${SESSNAME[q.sess]} · ${SUBJS[q.subj]} · 第 ${q.n} 題`:`學習指引 ${SUBJS[q.subj]} ${q.sec} ${q.secname} · 練習 ${q.n}`}
 function isRight(q,i){return q.a.includes(L[i])}
 function record(q,i){
@@ -305,7 +315,7 @@ function rQuestion(){
   let verdict='';
   if(answered){const ok=isRight(q,pick);
     verdict=`<div class="verdict"><b class="${ok?'okt':'badt'}">${ok?'答對了':'答錯了'}</b>　正確答案：<b>${q.a.join('、')}</b>
-    <p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。可到「重點整理」複習相關概念。</span>'}</p></div>`;}
+    <p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。可到「重點整理」複習相關概念。</span>'}</p>${srcLinks(q)}</div>`;}
   const done=Object.keys(s.picks).length;
   app.innerHTML=`<section class="view"><div class="panel">
     <div class="progress"><span class="num">${s.i+1} / ${s.ids.length}</span><div class="meter"><i style="width:${(s.i+1)/s.ids.length*100}%"></i></div><span class="num">✓ ${s.right}　✗ ${s.wrongCnt}</span></div>
@@ -403,7 +413,7 @@ function rMockResult(){const m=mock;
   if(show!==null){const q=BYID[m.ids[show]],p=m.picks[show];
     detail=`<div class="panel"><div class="qmeta"><span class="qno">第 ${show+1} 題</span><span>${esc(metaOf(q))}</span></div><div class="stem">${esc(q.q)}</div>
      <div class="opts">${q.o.map((o,i)=>`<button class="opt ${isRight(q,i)?'right':(i===p?'wrong':'')}" disabled><span class="bub">${L[i]}</span><span>${esc(o)}</span></button>`).join('')}</div>
-     <div class="verdict"><b class="${p!==undefined&&isRight(q,p)?'okt':'badt'}">${p===undefined?'未作答':(isRight(q,p)?'答對':'答錯')}</b>　正確答案：<b>${q.a.join('、')}</b>${p!==undefined?`　你的答案：${L[p]}`:''}<p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。</span>'}</p></div></div>`;}
+     <div class="verdict"><b class="${p!==undefined&&isRight(q,p)?'okt':'badt'}">${p===undefined?'未作答':(isRight(q,p)?'答對':'答錯')}</b>　正確答案：<b>${q.a.join('、')}</b>${p!==undefined?`　你的答案：${L[p]}`:''}<p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。</span>'}</p>${srcLinks(q)}</div></div>`;}
   app.innerHTML=`<section class="view"><div class="panel"><div class="label">成績</div>
    <div class="score" style="margin:10px 0"><span class="big">${m.score}</span><span>分</span>${verdict}</div>
    <p class="muted" style="margin:0">答對 ${m.right} / ${m.ids.length} 題，用時 ${fmtT(m.used)}。答錯與未作答的題目已加入錯題本。</p>
@@ -424,7 +434,7 @@ function rWrong(){
    <button class="btn primary" id="wgo" ${list.length?'':'disabled'}>重刷錯題（${list.length}）</button></div>
    <div class="list">${list.length?list.map(q=>{const r=S.ans[q.id]||{c:0,w:0};return `<div class="item"><div class="qhead"><div class="qmeta"><span>${esc(metaOf(q))}</span><span class="pill bad">錯 ${r.w} 次</span></div><button class="btn small ghost" data-rm="${q.id}">移出</button></div>
      <div class="stem">${esc(q.q)}</div><ol>${q.o.map((o,i)=>`<li class="${isRight(q,i)?'c':''}">(${L[i]}) ${esc(o)}</li>`).join('')}</ol>
-     ${q.e?`<details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:13px">看解析</summary><p style="white-space:pre-wrap;font-size:14px;margin:6px 0 0">${esc(q.e)}</p></details>`:''}</div>`}).join(''):`<div class="panel"><p style="margin:0">目前沒有錯題。去<a href="#" id="topr" style="color:var(--accent)">練習</a>或<a href="#" id="tomk" style="color:var(--accent)">模擬考</a>刷一輪吧。</p></div>`}</div></section>`;
+     ${q.e?`<details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:13px">看解析</summary><p style="white-space:pre-wrap;font-size:14px;margin:6px 0 0">${esc(q.e)}</p></details>`:''}${srcLinks(q)}</div>`}).join(''):`<div class="panel"><p style="margin:0">目前沒有錯題。去<a href="#" id="topr" style="color:var(--accent)">練習</a>或<a href="#" id="tomk" style="color:var(--accent)">模擬考</a>刷一輪吧。</p></div>`}</div></section>`;
   $('#wf').onchange=e=>{wfilter=+e.target.value;rWrong()};
   $('#wgo').onclick=()=>startPractice({subj:wfilter,srcs:['exam','guide'],sess:SESS.map(x=>x[0]),range:'wrong',order:'rand'});
   app.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{removeWrong(b.dataset.rm);rWrong()});
@@ -440,7 +450,7 @@ function rNotes(){
    <div class="notes">${secs.map((s,k)=>{const n=BANK.filter(q=>q.src==='guide'&&q.subj===s.subj&&q.sec===s.sec).length;
      return `<details class="sec" ${k===0?'open':''}><summary><h2><span class="secno">${s.sec}</span>${esc(s.title)}</h2><span class="muted" style="font-size:13px">${s.topics.length} 個主題 · ${n} 題練習</span></summary>
      <div class="secbody">${s.topics.map(t=>`<div class="topic"><h3>${esc(t.h)}</h3><ul>${t.pts.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>`).join('')}
-     <div class="row"><button class="btn small primary" data-sec="${s.sec}" data-subj="${s.subj}">練本節的 ${n} 題練習題</button></div></div></details>`}).join('')}</div>
+     <div class="row"><button class="btn small primary" data-sec="${s.sec}" data-subj="${s.subj}">練本節的 ${n} 題練習題</button>${s.pdf?`<a class="btn small" href="${esc(s.pdf)}#page=${s.page}" target="_blank" rel="noopener">看學習指引原文（第 ${s.page} 頁起）</a>`:''}</div></div></details>`}).join('')}</div>
    <p class="src">整理自 iPAS AI 應用規劃師（初級）學習指引科目一、科目二，並依學習指引勘誤表修正（平均差定義、型一／型二錯誤表格、3.2 節練習第 3、7 題）。</p></section>`;
   $('#ns').onchange=e=>{nsubj=+e.target.value;rNotes()};
   app.querySelectorAll('[data-sec]').forEach(b=>b.onclick=()=>startPractice({subj:+b.dataset.subj,srcs:['guide'],sess:[],sec:b.dataset.sec,range:'all',order:'seq'}));
@@ -457,11 +467,75 @@ function rNotes(){
   function readSession(){ try{ const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&s.exp>Date.now()&&allowed.includes(s.email)) return s; }catch(e){} return null; }
   function decode(jwt){ const b=jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'); return JSON.parse(decodeURIComponent(escape(atob(b+'==='.slice((b.length+3)%4))))); }
   function enter(s){
-    who.innerHTML=`${s.picture?`<img src="${esc(s.picture)}" alt="" referrerpolicy="no-referrer">`:''}<span>${esc(s.email)}</span><button class="btn small ghost" id="logout">登出</button>`;
+    who.innerHTML=`${s.picture?`<img src="${esc(s.picture)}" alt="" referrerpolicy="no-referrer">`:''}<span class="whoname">${esc(s.email)}</span><button class="btn small" id="syncbtn" title="同步到 Google 雲端硬碟">☁ 連接雲端硬碟</button><button class="btn small ghost" id="logout">登出</button>`;
     who.hidden=false; gate.hidden=true;
     $('#logout').onclick=()=>{ if(mock&&!mock.done){toast('模擬考進行中，交卷後再登出');return}
-      try{localStorage.removeItem(SKEY)}catch(e){} if(window.google&&google.accounts) google.accounts.id.disableAutoSelect(); location.reload(); };
-    start();
+      try{localStorage.removeItem(SKEY);localStorage.removeItem(TKEY)}catch(e){} if(window.google&&google.accounts) google.accounts.id.disableAutoSelect(); location.reload(); };
+    start(); initDrive(s.email);
+  }
+
+  /* ---------- Google 雲端硬碟同步（appDataFolder） ---------- */
+  const TKEY='ipas-aiap-drive-token', FNAME='ipas-aiap-progress.json', SCOPE='https://www.googleapis.com/auth/drive.appdata';
+  function mergeState(a,b){
+    const out={ans:{},wrong:[],star:[],mocks:[]};
+    const ids=new Set([...Object.keys(a.ans||{}),...Object.keys(b.ans||{})]);
+    ids.forEach(id=>{const x=(a.ans||{})[id],y=(b.ans||{})[id]; out.ans[id]=!x?y:!y?x:((x.t||0)>=(y.t||0)?x:y)});
+    const newer=(a.updated||0)>=(b.updated||0)?a:b;
+    out.wrong=[...new Set(newer.wrong||[])]; out.star=[...new Set(newer.star||[])];
+    const seen=new Set(); [...(a.mocks||[]),...(b.mocks||[])].sort((p,q)=>p.t-q.t).forEach(m=>{if(!seen.has(m.t)){seen.add(m.t);out.mocks.push(m)}});
+    out.updated=Math.max(a.updated||0,b.updated||0); return out;
+  }
+  function initDrive(email){
+    const btn=$('#syncbtn'); let token=null, fileId=null, tokenClient=null, pushTimer=null, busy=false;
+    try{const t=JSON.parse(localStorage.getItem(TKEY)||'null'); if(t&&t.exp>Date.now()+60000&&t.email===email) token=t.token;}catch(e){}
+    const setBtn=(txt,title)=>{btn.textContent=txt; if(title) btn.title=title;};
+    async function api(url,opt={}){
+      const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+token},opt.headers||{})}));
+      if(r.status===401){ token=null; try{localStorage.removeItem(TKEY)}catch(e){} throw new Error('auth'); }
+      if(!r.ok) throw new Error('http '+r.status);
+      return r;
+    }
+    async function findFile(){
+      const q=encodeURIComponent(`name='${FNAME}'`);
+      const r=await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&pageSize=10`);
+      const j=await r.json(); return j.files&&j.files[0]?j.files[0].id:null;
+    }
+    async function upload(){
+      const body=JSON.stringify(S);
+      if(fileId){ await api(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{method:'PATCH',headers:{'Content-Type':'application/json'},body}); return; }
+      const boundary='ipasb'+Date.now();
+      const multipart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:FNAME,parents:['appDataFolder']})}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+      const r=await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
+      fileId=(await r.json()).id;
+    }
+    async function fullSync(){
+      if(!token||busy) return; busy=true; setBtn('☁ 同步中…');
+      try{
+        if(!fileId) fileId=await findFile();
+        if(fileId){ const r=await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`); let remote={}; try{remote=await r.json()}catch(e){}
+          S=mergeState(S,remote); try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} }
+        await upload(); setBtn('☁ 已同步','已同步到你的 Google 雲端硬碟 · '+new Date().toLocaleTimeString('zh-TW'));
+        if(!(mock&&!mock.done)&&!(view==='practice'&&session)) render();
+      }catch(e){ setBtn(e.message==='auth'?'☁ 重新連接雲端硬碟':'☁ 同步失敗，點此重試'); }
+      busy=false;
+    }
+    window.__drivePush=()=>{ if(!token) return; clearTimeout(pushTimer); setBtn('☁ 待同步');
+      pushTimer=setTimeout(async()=>{ if(busy){window.__drivePush();return} busy=true; setBtn('☁ 同步中…');
+        try{ if(!fileId) fileId=await findFile(); await upload(); setBtn('☁ 已同步','已同步到你的 Google 雲端硬碟 · '+new Date().toLocaleTimeString('zh-TW')); }
+        catch(e){ setBtn(e.message==='auth'?'☁ 重新連接雲端硬碟':'☁ 同步失敗，點此重試'); }
+        busy=false; },1500); };
+    function getToken(){
+      if(!tokenClient){
+        if(!(window.google&&google.accounts&&google.accounts.oauth2)){ toast('Google 元件還沒載入，請稍候再試'); return; }
+        tokenClient=google.accounts.oauth2.initTokenClient({client_id:CID,scope:SCOPE,hint:email,callback:resp=>{
+          if(resp.error){ setBtn('☁ 連接雲端硬碟'); toast('沒有取得雲端硬碟授權'); return; }
+          token=resp.access_token; try{localStorage.setItem(TKEY,JSON.stringify({token,email,exp:Date.now()+(resp.expires_in||3600)*1000}))}catch(e){}
+          fullSync(); }});
+      }
+      tokenClient.requestAccessToken({prompt:''});
+    }
+    btn.onclick=()=>{ if(token) fullSync(); else getToken(); };
+    if(token) fullSync(); else setBtn('☁ 連接雲端硬碟','點一下授權，把紀錄同步到你的 Google 雲端硬碟');
   }
   function showLogin(text){ gate.hidden=false; who.hidden=true; msg.textContent=text; }
   const sess=readSession(); if(sess){ enter(sess); return; }
