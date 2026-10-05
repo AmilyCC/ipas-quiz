@@ -97,9 +97,10 @@ td.r,th.r{text-align:right}
 .qno{font-family:var(--mono);font-weight:700;color:var(--ink);font-size:14px}
 .stem{white-space:pre-wrap;font-size:16.5px;line-height:1.8;margin:14px 0 18px;max-width:68ch}
 .opts{display:grid;gap:10px}
-.opt{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 14px;cursor:pointer;line-height:1.65}
-.opt:hover:not(:disabled){border-color:var(--accent)}
-.opt:disabled{cursor:default}
+.opt{user-select:text;-webkit-user-select:text;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 14px;cursor:pointer;line-height:1.65}
+.opt:hover:not([aria-disabled="true"]){border-color:var(--accent)}
+.opt[aria-disabled="true"]{cursor:text}
+.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .bub{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--muted);display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:13px;color:var(--muted);margin-top:-2px}
 .opt.sel{border-color:var(--accent);background:var(--accent-soft)}
 .opt.sel .bub{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -311,7 +312,7 @@ function rQuestion(){
   const s=session, q=BYID[s.ids[s.i]], pick=s.picks[q.id];
   const answered=pick!==undefined;
   const opts=q.o.map((o,i)=>{let cls=''; if(answered){ if(isRight(q,i)) cls='right'; else if(i===pick) cls='wrong';}
-    return `<button class="opt ${cls}" data-i="${i}" ${answered?'disabled':''}><span class="bub">${L[i]}</span><span>${esc(o)}</span></button>`}).join('');
+    return `<div class="opt ${cls}" role="button" tabindex="${answered?-1:0}" data-i="${i}" aria-disabled="${answered}"><span class="bub">${L[i]}</span><span>${esc(o)}</span></div>`}).join('');
   let verdict='';
   if(answered){const ok=isRight(q,pick);
     verdict=`<div class="verdict"><b class="${ok?'okt':'badt'}">${ok?'答對了':'答錯了'}</b>　正確答案：<b>${q.a.join('、')}</b>
@@ -328,7 +329,8 @@ function rQuestion(){
       ${s.i<s.ids.length-1?`<button class="btn primary" id="next">下一題 →</button>`:`<button class="btn primary" id="fin">結束練習</button>`}</div>
   </div>
   <div class="row"><button class="btn ghost small" id="quit">回到練習設定</button></div></section>`;
-  $('#opts').onclick=e=>{const b=e.target.closest('.opt'); if(!b||b.disabled)return; answer(+b.dataset.i)};
+  $('#opts').onclick=e=>{if(String(getSelection())) return; const b=e.target.closest('.opt'); if(!b||b.getAttribute('aria-disabled')==='true')return; answer(+b.dataset.i)};
+  $('#opts').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){const b=e.target.closest('.opt'); if(b&&b.getAttribute('aria-disabled')!=='true'){e.preventDefault();e.stopPropagation();answer(+b.dataset.i)}}};
   $('#star').onclick=()=>{toggleStar(q.id);rQuestion()};
   $('#prev').onclick=()=>{s.i--;rQuestion()};
   const nx=$('#next'); if(nx) nx.onclick=()=>{s.i++;rQuestion();window.scrollTo(0,0)};
@@ -347,6 +349,7 @@ function finishPractice(){const s=session; const n=Object.keys(s.picks).length;
 }
 document.addEventListener('keydown',e=>{
   if(e.target.matches('input,select,textarea'))return;
+  if(e.ctrlKey||e.metaKey||e.altKey)return;   /* 保留 Ctrl/⌘+C 等快捷鍵給瀏覽器 */
   const k=e.key.toUpperCase();
   if(view==='practice'&&session&&$('#opts')){
     const idx=L.indexOf(k)>=0?L.indexOf(k):(['1','2','3','4'].indexOf(k));
@@ -391,11 +394,12 @@ function rMockQ(){
    <div id="cbox"></div>
    <div class="qhead" style="margin-top:16px"><div class="qmeta"><span class="qno">第 ${m.i+1} 題</span></div></div>
    <div class="stem">${esc(q.q)}</div>
-   <div class="opts" id="mopts">${q.o.map((o,i)=>`<button class="opt ${pick===i?'sel':''}" data-i="${i}"><span class="bub">${L[i]}</span><span>${esc(o)}</span></button>`).join('')}</div>
+   <div class="opts" id="mopts">${q.o.map((o,i)=>`<div class="opt ${pick===i?'sel':''}" role="button" tabindex="0" data-i="${i}"><span class="bub">${L[i]}</span><span>${esc(o)}</span></div>`).join('')}</div>
    <div class="qnav"><button class="btn" id="mprev" ${m.i===0?'disabled':''}>← 上一題</button><button class="btn primary" id="mnext" ${m.i===m.ids.length-1?'disabled':''}>下一題 →</button></div>
   </div>
   <div class="panel"><div class="label" style="margin-bottom:8px">題號（藍色為已作答）</div><div class="grid" id="mgrid">${m.ids.map((_,i)=>`<button class="${m.picks[i]!==undefined?'done':''} ${i===m.i?'cur':''}" data-i="${i}">${i+1}</button>`).join('')}</div></div></section>`;
-  $('#mopts').onclick=e=>{const b=e.target.closest('.opt');if(!b)return;m.picks[m.i]=+b.dataset.i; if(m.i<m.ids.length-1){m.i++;} rMockQ()};
+  $('#mopts').onclick=e=>{if(String(getSelection())) return; const b=e.target.closest('.opt');if(!b)return;m.picks[m.i]=+b.dataset.i; if(m.i<m.ids.length-1){m.i++;} rMockQ()};
+  $('#mopts').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){const b=e.target.closest('.opt'); if(b){e.preventDefault();e.stopPropagation();b.click()}}};
   $('#mprev').onclick=()=>{m.i--;rMockQ()}; $('#mnext').onclick=()=>{m.i++;rMockQ()};
   $('#mgrid').onclick=e=>{const b=e.target.closest('button');if(!b)return;m.i=+b.dataset.i;rMockQ()};
   $('#sub').onclick=()=>{const left=m.ids.length-Object.keys(m.picks).length;
@@ -412,7 +416,7 @@ function rMockResult(){const m=mock;
   let detail='';
   if(show!==null){const q=BYID[m.ids[show]],p=m.picks[show];
     detail=`<div class="panel"><div class="qmeta"><span class="qno">第 ${show+1} 題</span><span>${esc(metaOf(q))}</span></div><div class="stem">${esc(q.q)}</div>
-     <div class="opts">${q.o.map((o,i)=>`<button class="opt ${isRight(q,i)?'right':(i===p?'wrong':'')}" disabled><span class="bub">${L[i]}</span><span>${esc(o)}</span></button>`).join('')}</div>
+     <div class="opts">${q.o.map((o,i)=>`<div class="opt ${isRight(q,i)?'right':(i===p?'wrong':'')}" aria-disabled="true"><span class="bub">${L[i]}</span><span>${esc(o)}</span></div>`).join('')}</div>
      <div class="verdict"><b class="${p!==undefined&&isRight(q,p)?'okt':'badt'}">${p===undefined?'未作答':(isRight(q,p)?'答對':'答錯')}</b>　正確答案：<b>${q.a.join('、')}</b>${p!==undefined?`　你的答案：${L[p]}`:''}<p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。</span>'}</p>${srcLinks(q)}</div></div>`;}
   app.innerHTML=`<section class="view"><div class="panel"><div class="label">成績</div>
    <div class="score" style="margin:10px 0"><span class="big">${m.score}</span><span>分</span>${verdict}</div>
@@ -563,8 +567,9 @@ function rNotes(){
     window.__drivePush=push;
     /* token 過期（約 1 小時）時自動續期：瀏覽器只允許在使用者操作時開授權視窗，
        所以在下一次點擊或按鍵時靜默續期（已授權過不會再問，視窗會自動關閉）。 */
-    function renew(){
-      if(!waitingGesture) return; waitingGesture=false;
+    function renew(e){
+      if(!waitingGesture) return;
+      if(e&&e.type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey)) return; waitingGesture=false;
       document.removeEventListener('pointerdown',renew,true); document.removeEventListener('keydown',renew,true);
       gisReady(()=>requestToken({prompt:'',hint:email,login_hint:email},resp=>{
         if(resp&&resp.access_token&&google.accounts.oauth2.hasGrantedAllScopes(resp,'https://www.googleapis.com/auth/drive.appdata')){ token=resp.access_token; saveToken(token,email,resp.expires_in); fullSync(); }
