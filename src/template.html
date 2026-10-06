@@ -135,7 +135,8 @@ td.r,th.r{text-align:right}
 .item .stem{font-size:15px;margin:8px 0}
 .item ol{margin:0;padding-left:0;list-style:none;display:grid;gap:4px;font-size:14px}
 .item li.c{color:var(--ok);font-weight:700}
-.item li.y{color:var(--bad);text-decoration:line-through}
+.item li.y{color:var(--bad)}
+.item li .wpn{font-size:12px;font-weight:700;white-space:nowrap}
 /* notes */
 .notes{display:grid;gap:14px}
 details.sec{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0}
@@ -224,10 +225,15 @@ function metaOf(q){return q.src==='exam'?`${SESSNAME[q.sess]} · ${SUBJS[q.subj]
 function isRight(q,i){return q.a.includes(L[i])}
 function record(q,i){
   const ok=isRight(q,i); const r=S.ans[q.id]||{c:0,w:0};
-  ok?r.c++:r.w++; r.last=ok; r.t=Date.now(); S.ans[q.id]=r;
+  ok?r.c++:r.w++; r.last=ok; r.t=Date.now();
+  if(!ok){ r.wp=r.wp||{}; r.wp[L[i]]=(r.wp[L[i]]||0)+1; r.lp=L[i]; }
+  S.ans[q.id]=r;
   if(!ok && !S.wrong.includes(q.id)) S.wrong.push(q.id);
   save(); return ok;
 }
+function wrongPicks(q){ const r=S.ans[q.id]; return r&&r.wp?r.wp:{}; }
+function wpText(q){ const w=wrongPicks(q); const k=Object.keys(w).sort(); return k.length?k.map(x=>`${x}×${w[x]}`).join('、'):''; }
+function wpLine(q){ const s=wpText(q); return s?`<div class="srcl">你選錯過的選項：<b style="color:var(--bad)">${s}</b></div>`:''; }
 function removeWrong(id){S.wrong=S.wrong.filter(x=>x!==id);save()}
 function toggleStar(id){S.star.includes(id)?S.star=S.star.filter(x=>x!==id):S.star.push(id);save()}
 
@@ -316,7 +322,7 @@ function rQuestion(){
   let verdict='';
   if(answered){const ok=isRight(q,pick);
     verdict=`<div class="verdict"><b class="${ok?'okt':'badt'}">${ok?'答對了':'答錯了'}</b>　正確答案：<b>${q.a.join('、')}</b>
-    <p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。可到「重點整理」複習相關概念。</span>'}</p>${srcLinks(q)}</div>`;}
+    <p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。可到「重點整理」複習相關概念。</span>'}</p>${wpLine(q)}${srcLinks(q)}</div>`;}
   const done=Object.keys(s.picks).length;
   app.innerHTML=`<section class="view"><div class="panel">
     <div class="progress"><span class="num">${s.i+1} / ${s.ids.length}</span><div class="meter"><i style="width:${(s.i+1)/s.ids.length*100}%"></i></div><span class="num">✓ ${s.right}　✗ ${s.wrongCnt}</span></div>
@@ -417,7 +423,7 @@ function rMockResult(){const m=mock;
   if(show!==null){const q=BYID[m.ids[show]],p=m.picks[show];
     detail=`<div class="panel"><div class="qmeta"><span class="qno">第 ${show+1} 題</span><span>${esc(metaOf(q))}</span></div><div class="stem">${esc(q.q)}</div>
      <div class="opts">${q.o.map((o,i)=>`<div class="opt ${isRight(q,i)?'right':(i===p?'wrong':'')}" aria-disabled="true"><span class="bub">${L[i]}</span><span>${esc(o)}</span></div>`).join('')}</div>
-     <div class="verdict"><b class="${p!==undefined&&isRight(q,p)?'okt':'badt'}">${p===undefined?'未作答':(isRight(q,p)?'答對':'答錯')}</b>　正確答案：<b>${q.a.join('、')}</b>${p!==undefined?`　你的答案：${L[p]}`:''}<p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。</span>'}</p>${srcLinks(q)}</div></div>`;}
+     <div class="verdict"><b class="${p!==undefined&&isRight(q,p)?'okt':'badt'}">${p===undefined?'未作答':(isRight(q,p)?'答對':'答錯')}</b>　正確答案：<b>${q.a.join('、')}</b>${p!==undefined?`　你的答案：${L[p]}`:''}<p>${q.e?esc(q.e):'<span class="muted">官方公告試題只提供答案，沒有解析。</span>'}</p>${wpLine(q)}${srcLinks(q)}</div></div>`;}
   app.innerHTML=`<section class="view"><div class="panel"><div class="label">成績</div>
    <div class="score" style="margin:10px 0"><span class="big">${m.score}</span><span>分</span>${verdict}</div>
    <p class="muted" style="margin:0">答對 ${m.right} / ${m.ids.length} 題，用時 ${fmtT(m.used)}。答錯與未作答的題目已加入錯題本。</p>
@@ -437,7 +443,7 @@ function rWrong(){
    <div class="row"><div class="chips" id="wf">${[[0,'全部'],[1,'科目一'],[2,'科目二']].map(([v,l])=>`<label><input type="radio" name="wf" value="${v}" ${wfilter===v?'checked':''}>${l}</label>`).join('')}</div>
    <button class="btn primary" id="wgo" ${list.length?'':'disabled'}>重刷錯題（${list.length}）</button></div>
    <div class="list">${list.length?list.map(q=>{const r=S.ans[q.id]||{c:0,w:0};return `<div class="item"><div class="qhead"><div class="qmeta"><span>${esc(metaOf(q))}</span><span class="pill bad">錯 ${r.w} 次</span></div><button class="btn small ghost" data-rm="${q.id}">移出</button></div>
-     <div class="stem">${esc(q.q)}</div><ol>${q.o.map((o,i)=>`<li class="${isRight(q,i)?'c':''}">(${L[i]}) ${esc(o)}</li>`).join('')}</ol>
+     <div class="stem">${esc(q.q)}</div><ol>${q.o.map((o,i)=>{const n=wrongPicks(q)[L[i]]; return `<li class="${isRight(q,i)?'c':(n?'y':'')}">(${L[i]}) ${esc(o)}${isRight(q,i)?'　✓ 正確答案':''}${n?`<span class="wpn">　✗ 你選過 ${n} 次</span>`:''}</li>`}).join('')}</ol>
      ${q.e?`<details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:13px">看解析</summary><p style="white-space:pre-wrap;font-size:14px;margin:6px 0 0">${esc(q.e)}</p></details>`:''}${srcLinks(q)}</div>`}).join(''):`<div class="panel"><p style="margin:0">目前沒有錯題。去<a href="#" id="topr" style="color:var(--accent)">練習</a>或<a href="#" id="tomk" style="color:var(--accent)">模擬考</a>刷一輪吧。</p></div>`}</div></section>`;
   $('#wf').onchange=e=>{wfilter=+e.target.value;rWrong()};
   $('#wgo').onclick=()=>startPractice({subj:wfilter,srcs:['exam','guide'],sess:SESS.map(x=>x[0]),range:'wrong',order:'rand'});
@@ -477,7 +483,9 @@ function rNotes(){
   function mergeState(a,b){
     const out={ans:{},wrong:[],star:[],mocks:[]};
     const ids=new Set([...Object.keys(a.ans||{}),...Object.keys(b.ans||{})]);
-    ids.forEach(id=>{const x=(a.ans||{})[id],y=(b.ans||{})[id]; out.ans[id]=!x?y:!y?x:((x.t||0)>=(y.t||0)?x:y)});
+    ids.forEach(id=>{const x=(a.ans||{})[id],y=(b.ans||{})[id]; if(!x||!y){out.ans[id]=x||y;return}
+      const m=Object.assign({},(x.t||0)>=(y.t||0)?x:y); const wp={}; [x.wp||{},y.wp||{}].forEach(o=>Object.keys(o).forEach(k=>wp[k]=Math.max(wp[k]||0,o[k])));
+      if(Object.keys(wp).length) m.wp=wp; out.ans[id]=m;});
     const newer=(a.updated||0)>=(b.updated||0)?a:b;
     out.wrong=[...new Set(newer.wrong||[])]; out.star=[...new Set(newer.star||[])];
     const seen=new Set(); [...(a.mocks||[]),...(b.mocks||[])].sort((p,q)=>p.t-q.t).forEach(m=>{if(!seen.has(m.t)){seen.add(m.t);out.mocks.push(m)}});
