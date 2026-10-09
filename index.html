@@ -228,14 +228,17 @@ function record(q,i){
   ok?r.c++:r.w++; r.last=ok; r.t=Date.now();
   if(!ok){ r.wp=r.wp||{}; r.wp[L[i]]=(r.wp[L[i]]||0)+1; r.lp=L[i]; }
   S.ans[q.id]=r;
-  if(!ok && !S.wrong.includes(q.id)) S.wrong.push(q.id);
+  if(!ok) markWrong(q.id,true);
   save(); return ok;
 }
 function wrongPicks(q){ const r=S.ans[q.id]; return r&&r.wp?r.wp:{}; }
 function wpText(q){ const w=wrongPicks(q); const k=Object.keys(w).sort(); return k.length?k.map(x=>`${x}×${w[x]}`).join('、'):''; }
 function wpLine(q){ const s=wpText(q); return s?`<div class="srcl">你選錯過的選項：<b style="color:var(--bad)">${s}</b></div>`:''; }
-function removeWrong(id){S.wrong=S.wrong.filter(x=>x!==id);save()}
-function toggleStar(id){S.star.includes(id)?S.star=S.star.filter(x=>x!==id):S.star.push(id);save()}
+/* 錯題、收藏都記下「何時加入／移除」，跨裝置合併時以最新的動作為準 */
+function markWrong(id,on){ S.wm=S.wm||{}; S.wm[id]=[on?1:0,Date.now()]; S.wrong=S.wrong.filter(x=>x!==id); if(on) S.wrong.push(id); }
+function markStar(id,on){ S.sm=S.sm||{}; S.sm[id]=[on?1:0,Date.now()]; S.star=S.star.filter(x=>x!==id); if(on) S.star.push(id); }
+function removeWrong(id){markWrong(id,false);save()}
+function toggleStar(id){markStar(id,!S.star.includes(id));save()}
 
 /* ---------- routing ---------- */
 let view='home'; let session=null; let mock=null; let timerId=null;
@@ -281,7 +284,7 @@ function rHome(){
   app.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>{startPractice({subj:+b.dataset.quick,srcs:['exam','guide'],sess:SESS.map(x=>x[0]),range:'new',order:'seq'})});
   app.querySelector('[data-go]').onclick=()=>go('mock');
   $('#reset').onclick=()=>{$('#resetbox').innerHTML=`<div class="confirm row"><span>確定清除作答、錯題、收藏與模擬考紀錄？無法復原。</span><button class="btn small" id="rsy">清除</button><button class="btn small ghost" id="rsn">取消</button></div>`;
-    $('#rsy').onclick=()=>{S={ans:{},wrong:[],star:[],mocks:[]};save();rHome();toast('已清除')};$('#rsn').onclick=()=>$('#resetbox').innerHTML=''};
+    $('#rsy').onclick=()=>{S={ans:{},wrong:[],star:[],mocks:[],resetAt:Date.now()};save();rHome();toast('已清除')};$('#rsn').onclick=()=>$('#resetbox').innerHTML=''};
 }
 
 /* ---------- practice ---------- */
@@ -413,7 +416,7 @@ function rMockQ(){
     $('#cy').onclick=submitMock; $('#cn').onclick=()=>$('#cbox').innerHTML=''};
 }
 function submitMock(){const m=mock; if(m.done)return; m.done=true; clearInterval(timerId); let right=0;
-  m.ids.forEach((id,i)=>{const q=BYID[id],p=m.picks[i]; if(p===undefined){ if(!S.wrong.includes(id))S.wrong.push(id); const r=S.ans[id]||{c:0,w:0}; r.w++; r.last=false; r.t=Date.now(); S.ans[id]=r; } else if(record(q,p)) right++;});
+  m.ids.forEach((id,i)=>{const q=BYID[id],p=m.picks[i]; if(p===undefined){ markWrong(id,true); const r=S.ans[id]||{c:0,w:0}; r.w++; r.last=false; r.t=Date.now(); S.ans[id]=r; } else if(record(q,p)) right++;});
   m.right=right; m.score=Math.round(right/m.ids.length*100); m.used=Date.now()-m.start;
   S.mocks.push({t:Date.now(),subj:m.subj,n:m.ids.length,right,score:m.score}); save(); m.i=-1; rMockResult(); window.scrollTo(0,0)}
 function rMockResult(){const m=mock;
@@ -481,13 +484,23 @@ function rNotes(){
   function readToken(email){ try{ const t=JSON.parse(localStorage.getItem(TKEY)||'null'); if(t&&t.exp>Date.now()+60000&&t.email===email) return t.token; }catch(e){} return null; }
   function saveToken(tok,email,sec){ try{ localStorage.setItem(TKEY,JSON.stringify({token:tok,email,exp:Date.now()+(sec||3600)*1000})) }catch(e){} }
   function mergeState(a,b){
-    const out={ans:{},wrong:[],star:[],mocks:[]};
+    /* 「清除所有紀錄」之後，較舊的那一份不再合併回來 */
+    const ra=a.resetAt||0, rb=b.resetAt||0;
+    if(ra>(b.updated||0)) b={}; if(rb>(a.updated||0)) a={};
+    const out={ans:{},wrong:[],star:[],mocks:[],resetAt:Math.max(ra,rb)};
     const ids=new Set([...Object.keys(a.ans||{}),...Object.keys(b.ans||{})]);
     ids.forEach(id=>{const x=(a.ans||{})[id],y=(b.ans||{})[id]; if(!x||!y){out.ans[id]=x||y;return}
       const m=Object.assign({},(x.t||0)>=(y.t||0)?x:y); const wp={}; [x.wp||{},y.wp||{}].forEach(o=>Object.keys(o).forEach(k=>wp[k]=Math.max(wp[k]||0,o[k])));
-      if(Object.keys(wp).length) m.wp=wp; out.ans[id]=m;});
-    const newer=(a.updated||0)>=(b.updated||0)?a:b;
-    out.wrong=[...new Set(newer.wrong||[])]; out.star=[...new Set(newer.star||[])];
+      if(Object.keys(wp).length) m.wp=wp; m.c=Math.max(x.c||0,y.c||0); m.w=Math.max(x.w||0,y.w||0); out.ans[id]=m;});
+    const mergeSet=(listKey,mapKey)=>{
+      const ma=a[mapKey]||{}, mb=b[mapKey]||{}, map={};
+      new Set([...Object.keys(ma),...Object.keys(mb)]).forEach(id=>{const x=ma[id],y=mb[id]; map[id]=!x?y:!y?x:(x[1]>=y[1]?x:y)});
+      const list=[]; const seen=new Set();
+      [...(a[listKey]||[]),...(b[listKey]||[])].forEach(id=>{ if(seen.has(id))return; seen.add(id); if(!map[id]||map[id][0]) list.push(id); });
+      Object.keys(map).forEach(id=>{ if(map[id][0]&&!seen.has(id)){ seen.add(id); list.push(id);} });
+      out[listKey]=list; out[mapKey]=map;
+    };
+    mergeSet('wrong','wm'); mergeSet('star','sm');
     const seen=new Set(); [...(a.mocks||[]),...(b.mocks||[])].sort((p,q)=>p.t-q.t).forEach(m=>{if(!seen.has(m.t)){seen.add(m.t);out.mocks.push(m)}});
     out.updated=Math.max(a.updated||0,b.updated||0); return out;
   }
@@ -532,17 +545,17 @@ function rNotes(){
   }
 
   function initDrive(email,token){
-    const btn=$('#syncbtn'); let fileId=null, pushTimer=null, busy=false, dirty=false, waitingGesture=false;
+    const btn=$('#syncbtn'); let fileId=null, pushTimer=null, busy=false, again=false, lastSync=0;
     const setBtn=(txt,title)=>{btn.textContent=txt; btn.title=title||txt;};
     async function api(url,opt={}){
-      const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+token},opt.headers||{})}));
-      if(r.status===401){ token=null; try{localStorage.removeItem(TKEY)}catch(e){} throw new Error('auth'); }
+      const r=await fetch(url,Object.assign({cache:'no-store'},opt,{headers:Object.assign({Authorization:'Bearer '+token},opt.headers||{})}));
+      if(r.status===401||r.status===403){ token=null; try{localStorage.removeItem(TKEY)}catch(e){} throw new Error('auth'); }
       if(!r.ok) throw new Error('http '+r.status);
       return r;
     }
     async function findFile(){
       const q=encodeURIComponent(`name='${FNAME}'`);
-      const j=await (await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id)&pageSize=10`)).json();
+      const j=await (await api(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)&orderBy=modifiedTime desc&pageSize=10`)).json();
       return j.files&&j.files[0]?j.files[0].id:null;
     }
     async function upload(){
@@ -552,46 +565,51 @@ function rNotes(){
       const mp=`--${bd}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({name:FNAME,parents:['appDataFolder']})}\r\n--${bd}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${bd}--`;
       fileId=(await (await api('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+bd},body:mp})).json()).id;
     }
-    const okText=()=>setBtn('☁ 已同步','已同步到你的 Google 雲端硬碟 · '+new Date().toLocaleTimeString('zh-TW'));
-    function onFail(e){ if(e.message==='auth') needToken(); else setBtn('☁ 同步失敗','同步失敗，會在下次作答時重試；也可以點這裡重試'); }
-    async function fullSync(){
-      if(!token){ needToken(); return; } if(busy){ dirty=true; return; } busy=true; setBtn('☁ 同步中…');
+    const okText=()=>setBtn('☁ 已同步','已和 Google 雲端硬碟同步 · '+new Date().toLocaleTimeString('zh-TW')+'（點一下可立即同步）');
+    const busyUI=()=>(mock&&!mock.done)||(view==='practice'&&session);
+    /* 每次同步都是「先下載雲端 → 合併 → 再上傳」，不會用某台裝置的舊資料蓋掉其他裝置 */
+    async function sync(){
+      if(!token){ needToken(); return; }
+      if(busy){ again=true; return; } busy=true; setBtn('☁ 同步中…');
       try{
         if(!fileId) fileId=await findFile();
-        if(fileId){ let remote={}; try{ remote=await (await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`)).json(); }catch(e){ if(e.message==='auth') throw e; }
-          S=mergeState(S,remote); try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} }
-        await upload(); dirty=false; okText();
-        if(!(mock&&!mock.done)&&!(view==='practice'&&session)) render();
-      }catch(e){ onFail(e); }
-      busy=false; if(dirty&&token) push();
+        let changed=false;
+        if(fileId){ const remote=await (await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`)).json().catch(()=>({}));
+          const before=JSON.stringify(S); S=mergeState(S,remote||{}); changed=JSON.stringify(S)!==before;
+          try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){} }
+        await upload(); lastSync=Date.now(); okText();
+        if(changed&&!busyUI()) render();
+      }catch(e){ if(e.message==='auth') needToken(); else setBtn('☁ 同步失敗，點此重試','同步失敗（網路或 Google 暫時無法連線），點一下重試'); }
+      busy=false; if(again){ again=false; sync(); }
     }
-    function push(){
-      if(!token){ dirty=true; needToken(); return; }
-      clearTimeout(pushTimer); setBtn('☁ 待同步');
-      pushTimer=setTimeout(async()=>{ if(busy){dirty=true;return} busy=true; setBtn('☁ 同步中…');
-        try{ if(!fileId) fileId=await findFile(); await upload(); dirty=false; okText(); }catch(e){ onFail(e); }
-        busy=false; if(dirty&&token) push(); },1500);
-    }
-    window.__drivePush=push;
-    /* token 過期（約 1 小時）時自動續期：瀏覽器只允許在使用者操作時開授權視窗，
-       所以在下一次點擊或按鍵時靜默續期（已授權過不會再問，視窗會自動關閉）。 */
-    function renew(e){
-      if(!waitingGesture) return;
-      if(e&&e.type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey)) return; waitingGesture=false;
-      document.removeEventListener('pointerdown',renew,true); document.removeEventListener('keydown',renew,true);
+    window.__drivePush=()=>{ clearTimeout(pushTimer); if(!token){ needToken(); return; } setBtn('☁ 待同步'); pushTimer=setTimeout(sync,1500); };
+
+    /* 授權約 1 小時過期。續期要開 Google 視窗，瀏覽器只允許在「點擊」時開，
+       所以：按同步按鈕一定會續期；另外在下一次點擊頁面任何地方時也會自動續期。 */
+    let renewing=false, autoRenewArmed=false;
+    function renew(){
+      if(renewing) return; renewing=true; setBtn('☁ 連線中…');
+      setTimeout(()=>{ if(renewing){ renewing=false; if(!token) setBtn('☁ 點此同步','連線逾時，點一下再試'); } },60000);
       gisReady(()=>requestToken({prompt:'',hint:email,login_hint:email},resp=>{
-        if(resp&&resp.access_token&&google.accounts.oauth2.hasGrantedAllScopes(resp,'https://www.googleapis.com/auth/drive.appdata')){ token=resp.access_token; saveToken(token,email,resp.expires_in); fullSync(); }
-        else { setBtn('☁ 點此重新連線','雲端硬碟授權沒有完成，點這裡再試一次'); }
+        renewing=false;
+        if(resp&&resp.access_token&&google.accounts.oauth2.hasGrantedAllScopes(resp,'https://www.googleapis.com/auth/drive.appdata')){ token=resp.access_token; saveToken(token,email,resp.expires_in); sync(); }
+        else setBtn('☁ 點此同步','沒有完成雲端硬碟授權。點一下重新連線（若沒跳出視窗，請允許此網站的彈出式視窗）');
       }));
     }
+    function onGesture(e){ if(!autoRenewArmed||token) return; if(e.target&&e.target.closest&&e.target.closest('#syncbtn')) return;
+      autoRenewArmed=false; document.removeEventListener('click',onGesture,true); renew(); }
     function needToken(){
-      token=null; setBtn('☁ 待同步','下次點擊時會自動重新連線雲端硬碟');
-      if(waitingGesture) return; waitingGesture=true;
-      document.addEventListener('pointerdown',renew,true); document.addEventListener('keydown',renew,true);
+      token=null; if(!renewing) setBtn('☁ 點此同步','雲端硬碟授權已過期，點一下重新連線並同步');
+      if(!autoRenewArmed){ autoRenewArmed=true; document.addEventListener('click',onGesture,true); }
     }
-    btn.onclick=()=>{ if(token) fullSync(); };
-    if(token) fullSync(); else needToken();
+    btn.onclick=()=>{ if(token) sync(); else renew(); };
+
+    /* 其他裝置的進度：回到這個分頁時、以及每 60 秒自動拉一次 */
+    document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&token&&Date.now()-lastSync>10000) sync(); });
+    setInterval(()=>{ if(document.visibilityState==='visible'&&token&&!busyUI()) sync(); },60000);
+    if(token) sync(); else needToken();
   }
+
 
   const sess=readSession(); if(sess){ enter(sess,null); return; }
   showLogin('請用已授權的 Google 帳號登入。登入時一併授權雲端硬碟，作答紀錄會自動同步到你的 Google 雲端硬碟。');
