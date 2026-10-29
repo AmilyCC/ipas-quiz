@@ -150,6 +150,53 @@ details.sec>summary .secno{font-family:var(--mono);color:var(--accent);font-weig
 .topic h3{font-size:15.5px;margin-bottom:6px}
 .topic ul{margin:0;padding-left:1.2em;display:grid;gap:4px;max-width:70ch}
 .topic li::marker{color:var(--accent)}
+/* reader */
+.rhead{display:grid;gap:12px}
+.rsearch{display:flex;gap:8px;align-items:center}
+.rsearch input{flex:1;min-width:0;font:inherit;font-size:15px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.rsearch input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+.chlist{display:flex;gap:6px;flex-wrap:wrap}
+.chlist button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer;text-align:left}
+.chlist button b{font-family:var(--mono);color:var(--accent);margin-right:6px}
+.chlist button[aria-current="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.toc{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 16px}
+.toc summary{cursor:pointer;padding:8px 0;font-weight:700;font-size:14px}
+.toc ol{margin:0 0 10px;padding-left:1.4em;display:grid;gap:2px;font-size:14px}
+.toc a{color:var(--ink);text-decoration:none}.toc a:hover{color:var(--accent);text-decoration:underline}
+.toc li::marker{color:var(--muted);font-family:var(--mono);font-size:12px}
+.chtitle{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.chtitle .secno{font-family:var(--mono);color:var(--accent);font-weight:700}
+.reading{display:grid;gap:14px;min-width:0}.reading>*,.rbody,.rhead>*{min-width:0}
+.rsec{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;scroll-margin-top:120px}
+.rsec>header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.rsec h3{font-size:17.5px;font-family:var(--serif);font-weight:900;margin:0}
+.rsec .pg{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.rsec .pg a{color:var(--accent)}
+.rbody{font-size:15.5px;line-height:1.85;max-width:72ch}
+.rbody p{margin:.6em 0}
+.rbody h4{font-size:15.5px;margin:1.1em 0 .3em;padding-left:10px;border-left:3px solid var(--accent)}
+.rbody ul,.rbody ol{margin:.4em 0;padding-left:1.4em;display:grid;gap:3px}
+.rbody li::marker{color:var(--accent)}
+.rbody ul ul,.rbody ol ul{margin:.2em 0;font-size:14.5px;color:var(--muted)}
+.rbody b{color:var(--ink);font-weight:700}
+.rbody .tablewrap{margin:.7em 0;border:1px solid var(--line);border-radius:8px}
+.rbody table.rt{font-size:14px;line-height:1.6}
+.rbody table.rt th{background:var(--surface2);white-space:nowrap;font-weight:700}
+.rbody table.rt td{white-space:normal;vertical-align:top;min-width:6.5em}
+.rbody table.rt td:first-child{font-weight:500}
+.rbody table.rt tr:last-child td{border-bottom:0}
+code.fx{font-family:var(--mono);font-size:.88em;background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;white-space:nowrap}
+.callout{border-radius:8px;padding:8px 14px;margin:.8em 0;background:var(--accent-soft);border-left:3px solid var(--accent);font-size:14.5px}
+.callout.warn{background:var(--mark-soft);border-left-color:var(--mark)}
+.callout p{margin:.35em 0}
+mark{background:var(--mark-soft);color:inherit;border-radius:3px;padding:0 1px;box-shadow:0 0 0 1px var(--mark)}
+.hits{display:grid;gap:10px}
+.hit{display:block;text-align:left;width:100%;font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;cursor:pointer;color:var(--ink)}
+.hit:hover{border-color:var(--accent)}
+.hit .muted{font-size:12.5px}
+.hit p{margin:4px 0 0;font-size:14px}
+.chnav{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+@media (max-width:520px){.rsec{padding:14px 14px}.rbody{font-size:15px}nav.tabs button{padding:6px 9px}}
 .gate{position:fixed;inset:0;z-index:30;background:var(--bg);display:grid;place-items:center;padding-inline:16px}
 .gatebox{max-width:420px;width:100%;display:grid;gap:14px;text-align:left}
 .gatebox h1{font-size:26px}
@@ -170,7 +217,7 @@ details.sec>summary .secno{font-family:var(--mono);color:var(--accent);font-weig
 <header class="top"><div class="topin">
   <div class="brand">iPAS 初級刷題室<small>AI 應用規劃師</small></div>
   <nav class="tabs" id="tabs">
-    <button data-v="home">總覽</button><button data-v="practice">練習</button><button data-v="mock">模擬考</button><button data-v="wrong">錯題本</button><button data-v="notes">重點整理</button>
+    <button data-v="home">總覽</button><button data-v="practice">練習</button><button data-v="mock">模擬考</button><button data-v="wrong">錯題本</button><button data-v="reader">讀本</button><button data-v="notes">重點整理</button>
   </nav>
   <div class="who" id="who" hidden></div>
 </div></header>
@@ -194,10 +241,12 @@ window.ALLOWED_EMAILS = __ALLOWED_EMAILS__;
 </script>
 <script id="bank" type="application/json">__BANK__</script>
 <script id="notesdata" type="application/json">__NOTES__</script>
+<script id="readerdata" type="application/json">__READER__</script>
 <script>
 (function(){
 const BANK=JSON.parse(document.getElementById('bank').textContent);
 const NOTES=JSON.parse(document.getElementById('notesdata').textContent);
+const READER=JSON.parse(document.getElementById('readerdata').textContent);
 const BYID=Object.fromEntries(BANK.map(q=>[q.id,q]));
 const SESS=[['114-4','114 年第四次'],['115-1','115 年第一次'],['115-2','115 年第二次'],['115-3','115 年第三次']];
 const SESSNAME=Object.fromEntries(SESS);
@@ -219,7 +268,8 @@ function srcLinks(q){
   const u=(pg)=>esc(q.pdf)+(pg?'#page='+pg:'');
   const a=`<a href="${u(q.page)}" target="_blank" rel="noopener">${q.src==='exam'?'官方公告試題 PDF':'學習指引 PDF'} 第 ${q.page} 頁</a>`;
   const b=q.src==='guide'&&q.apage?`　<a href="${u(q.apage)}" target="_blank" rel="noopener">官方解析在第 ${q.apage} 頁</a>`:'';
-  return `<div class="srcl">出處：${a}${b}</div>`;
+  const c=q.src==='guide'&&READER.some(r=>r.subj===q.subj&&r.sec===q.sec)?`　<a href="#" data-read="${q.subj}|${q.sec}">回讀本 ${q.sec} 複習</a>`:'';
+  return `<div class="srcl">出處：${a}${b}${c}</div>`;
 }
 function metaOf(q){return q.src==='exam'?`${SESSNAME[q.sess]} · ${SUBJS[q.subj]} · 第 ${q.n} 題`:`學習指引 ${SUBJS[q.subj]} ${q.sec} ${q.secname} · 練習 ${q.n}`}
 function isRight(q,i){return q.a.includes(L[i])}
@@ -244,7 +294,7 @@ function toggleStar(id){markStar(id,!S.star.includes(id));save()}
 let view='home'; let session=null; let mock=null; let timerId=null;
 function go(v){view=v; document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v===v)); render(); window.scrollTo(0,0);}
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return; if(mock&&!mock.done&&b.dataset.v!=='mock'){toast('模擬考進行中，交卷後才能切換');return} go(b.dataset.v)});
-function render(){({home:rHome,practice:rPractice,mock:rMock,wrong:rWrong,notes:rNotes})[view]()}
+function render(){({home:rHome,practice:rPractice,mock:rMock,wrong:rWrong,reader:rReader,notes:rNotes})[view]()}
 
 /* ---------- home ---------- */
 function statsFor(filter){
@@ -453,6 +503,61 @@ function rWrong(){
   app.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{removeWrong(b.dataset.rm);rWrong()});
   const a=$('#topr'); if(a) a.onclick=e=>{e.preventDefault();go('practice')}; const b=$('#tomk'); if(b) b.onclick=e=>{e.preventDefault();go('mock')};
 }
+
+/* ---------- reader ---------- */
+let rsubj=1, rsec=null, rq='';
+try{const r=JSON.parse(localStorage.getItem('ipas-aiap-reader')||'null'); if(r){rsubj=r.subj||1; rsec=r.sec||null;}}catch(e){}
+function rememberReader(){try{localStorage.setItem('ipas-aiap-reader',JSON.stringify({subj:rsubj,sec:rsec}))}catch(e){}}
+const plain=h=>h.replace(/<[^>]+>/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/\s+/g,' ');
+function openReader(subj,sec,partIdx,q){rsubj=subj; rsec=sec; rq=''; view='reader';
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-current',b.dataset.v==='reader'));
+  rReader(); if(partIdx!=null){const el=document.getElementById('rp-'+partIdx); if(el){ if(q) markText(el,q); el.scrollIntoView(); return;}} window.scrollTo(0,0);}
+function markText(root,q){const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT); const ns=[]; let n; const lq=q.toLowerCase();
+  while(n=w.nextNode()) if(n.nodeValue.toLowerCase().includes(lq)) ns.push(n);
+  ns.forEach(n=>{const f=document.createDocumentFragment(); let t=n.nodeValue, i;
+    while((i=t.toLowerCase().indexOf(lq))>=0){f.append(t.slice(0,i)); const m=document.createElement('mark'); m.textContent=t.slice(i,i+q.length); f.append(m); t=t.slice(i+q.length);} f.append(t); n.replaceWith(f);});}
+function rReader(){
+  const chs=READER.filter(c=>c.subj===rsubj);
+  if(!chs.length){app.innerHTML='<section class="view"><p>讀本資料尚未載入。</p></section>';return}
+  let ch=chs.find(c=>c.sec===rsec)||chs[0]; rsec=ch.sec; rememberReader();
+  const ci=chs.indexOf(ch), prev=chs[ci-1], next=chs[ci+1];
+  const nq=BANK.filter(q=>q.src==='guide'&&q.subj===ch.subj&&q.sec===ch.sec).length;
+  const pg=p=>`<a href="${esc(ch.pdf)}#page=${p}" target="_blank" rel="noopener">原文第 ${p} 頁 ↗</a>`;
+  app.innerHTML=`<section class="view"><div class="rhead">
+    <div><div class="label">學習指引讀本</div><h1>${SUBJ[rsubj]}</h1><p class="muted" style="margin:6px 0 0">依官方學習指引逐節改寫成好讀的版本，已套用勘誤表；每節都附原文頁碼，有疑問可對照 PDF。</p></div>
+    <div class="chips" id="rs">${[1,2].map(v=>`<label><input type="radio" name="rs" value="${v}" ${rsubj===v?'checked':''}>${SUBJS[v]}</label>`).join('')}</div>
+    <div class="rsearch"><input id="rq" type="search" placeholder="搜尋讀本，例如：過擬合、ROI、溫度" value="${esc(rq)}" aria-label="搜尋讀本"></div>
+    </div><div id="rmain"></div></section>`;
+  $('#rs').onchange=e=>{rsubj=+e.target.value; rsec=null; rq=''; rReader(); window.scrollTo(0,0)};
+  const inp=$('#rq'); let tmr; inp.oninput=()=>{clearTimeout(tmr); tmr=setTimeout(()=>{rq=inp.value.trim(); drawMain()},180)};
+  function drawMain(){
+    const m=$('#rmain');
+    if(rq){
+      const lq=rq.toLowerCase(), hits=[];
+      READER.forEach(c=>c.parts.forEach((p,k)=>{const t=plain(p.html), i=t.toLowerCase().indexOf(lq), inH=p.h.toLowerCase().includes(lq);
+        if(i>=0||inH){const s=Math.max(0,i-30); hits.push({c,k,p,snip:i>=0?(s?'…':'')+t.slice(s,i+rq.length+50)+'…':''});}}));
+      const hl=s=>esc(s).replace(new RegExp(rq.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),'gi'),x=>`<mark>${x}</mark>`);
+      m.innerHTML=`<p class="muted" style="margin:14px 0 8px">找到 ${hits.length} 個段落</p><div class="hits">${hits.map((h,j)=>`<button class="hit" data-hit="${j}"><div class="muted">${SUBJS[h.c.subj]} · ${h.c.sec} ${esc(h.c.title)}</div><b>${hl(h.p.h)}</b>${h.snip?`<p>${hl(h.snip)}</p>`:''}</button>`).join('')}</div>`;
+      m.querySelectorAll('[data-hit]').forEach(b=>b.onclick=()=>{const h=hits[+b.dataset.hit]; openReader(h.c.subj,h.c.sec,h.k,rq)});
+      return;
+    }
+    m.innerHTML=`<div class="chlist" id="chl" style="margin:14px 0">${chs.map(c=>`<button data-ch="${c.sec}" aria-current="${c===ch}"><b>${c.sec}</b>${esc(c.title)}</button>`).join('')}</div>
+     <div class="reading">
+      <div class="chtitle"><h2 style="font-size:21px;font-family:var(--serif);font-weight:900;margin:0"><span class="secno">${ch.sec}</span> ${esc(ch.title)}</h2><span class="src">${pg(ch.page)}</span></div>
+      <details class="toc"><summary>本章目錄（${ch.parts.length} 節）</summary><ol>${ch.parts.map((p,k)=>`<li><a href="#rp-${k}" data-toc="${k}">${esc(p.h)}</a></li>`).join('')}</ol></details>
+      ${ch.parts.map((p,k)=>`<section class="rsec" id="rp-${k}"><header><h3>${esc(p.h)}</h3><span class="pg">${pg(p.page)}</span></header><div class="rbody">${p.html}</div></section>`).join('')}
+      <div class="panel"><div class="row" style="justify-content:space-between"><div><b>讀完了？</b><span class="muted">　用本章 ${nq} 題練習題檢查一下</span></div><button class="btn primary small" id="rpr" ${nq?'':'disabled'}>練 ${ch.sec} 的練習題</button></div></div>
+      <div class="chnav">${prev?`<button class="btn small" data-ch="${prev.sec}">← ${prev.sec} ${esc(prev.title)}</button>`:'<span></span>'}${next?`<button class="btn small" data-ch="${next.sec}">${next.sec} ${esc(next.title)} →</button>`:''}</div>
+     </div>`;
+    m.querySelectorAll('[data-ch]').forEach(b=>b.onclick=()=>{rsec=b.dataset.ch; rReader(); window.scrollTo(0,0)});
+    m.querySelectorAll('[data-toc]').forEach(a=>a.onclick=e=>{e.preventDefault(); document.getElementById('rp-'+a.dataset.toc).scrollIntoView({behavior:'smooth'})});
+    $('#rpr').onclick=()=>startPractice({subj:ch.subj,srcs:['guide'],sess:[],sec:ch.sec,range:'all',order:'seq'});
+  }
+  drawMain();
+}
+app.addEventListener('click',e=>{const a=e.target.closest('[data-read]'); if(!a) return; e.preventDefault();
+  if(mock&&!mock.done){toast('模擬考進行中，交卷後才能切換');return}
+  const [s,sec]=a.dataset.read.split('|'); openReader(+s,sec);});
 
 /* ---------- notes ---------- */
 let nsubj=1;
